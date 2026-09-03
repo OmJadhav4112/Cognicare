@@ -50,6 +50,10 @@ app.use(cors({
     // Allow requests with no origin (mobile, curl, server-to-server)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    // Allow any localhost origin in non-production environments
+    if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+      return callback(null, true);
+    }
     callback(new Error(`CORS policy: origin ${origin} not allowed`));
   },
   credentials: true

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getDifficulty, submitGameResult } from '../../../services/gamesService';
 import { getRandomItems, GAME_CONFIG } from '../../../data/nerContent';
 import PageHeader      from '../../../components/common/PageHeader';
@@ -39,8 +39,10 @@ const buildRound = (difficulty) => {
 };
 
 export default function PatternAttentionGame() {
+  const { t }    = useLanguage();
   const toast    = useToast();
   const startRef = useRef(null);
+  const scoresRef = useRef([]);
 
   const [phase,        setPhase]        = useState('setup');   // setup | playing | result
   const [difficulty,   setDifficulty]   = useState('easy');
@@ -53,6 +55,8 @@ export default function PatternAttentionGame() {
   const [result,       setResult]       = useState(null);
   const [loadingDiff,  setLoadingDiff]  = useState(true);
   const [saving,       setSaving]       = useState(false);
+
+  useEffect(() => { scoresRef.current = scores; }, [scores]);
 
   // Load recommended difficulty on mount
   useEffect(() => {
@@ -68,6 +72,7 @@ export default function PatternAttentionGame() {
     setTotalRounds(total);
     setRoundNum(1);
     setScores([]);
+    scoresRef.current = [];
     setResult(null);
     setSelected(null);
     setFeedback(null);
@@ -83,7 +88,12 @@ export default function PatternAttentionGame() {
     const isCorrect = item.id === round.oddId;
     setSelected(item.id);
     setFeedback(isCorrect ? 'correct' : 'wrong');
-    setScores(prev => [...prev, { correct: isCorrect, timeTaken }]);
+    const newEntry = { correct: isCorrect, timeTaken };
+    setScores(prev => {
+      const updated = [...prev, newEntry];
+      scoresRef.current = updated;
+      return updated;
+    });
   };
 
   // ── next question ─────────────────────────────────────────────────────────
@@ -101,7 +111,7 @@ export default function PatternAttentionGame() {
 
   // ── finish game ───────────────────────────────────────────────────────────
   const finishGame = async () => {
-    const allScores    = scores;   // already includes current round answer
+    const allScores    = scoresRef.current;
     const correctCount = allScores.filter(s => s.correct).length;
     const totalTime    = allScores.reduce((t, s) => t + s.timeTaken, 0);
     const accuracy     = allScores.length ? Math.round((correctCount / allScores.length) * 100) : 0;
@@ -114,7 +124,7 @@ export default function PatternAttentionGame() {
       correctAnswers: correctCount,
       totalQuestions: allScores.length,
       mistakes: allScores.length - correctCount,
-      gameLabel: 'Pattern Attention',
+      gameLabel: t('pattern_attention'),
     };
 
     setResult(res);
@@ -129,7 +139,7 @@ export default function PatternAttentionGame() {
         completed: true, culturalTheme: 'ner',
       });
     } catch {
-      toast('Could not save result.', 'warning');
+      toast(t('encourage_low'), 'warning');
     } finally {
       setSaving(false);
     }

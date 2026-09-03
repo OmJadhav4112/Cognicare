@@ -82,10 +82,7 @@ class HealthCheckService {
       // Get all caregivers
       const caregivers = await Caregiver.find()
         .populate('user')
-        .populate({
-          path: 'patients',
-          populate: { path: 'user' }
-        });
+        .populate('patients');
 
       results.totalCaregivers = caregivers.length;
 

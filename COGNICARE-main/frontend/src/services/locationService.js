@@ -1,12 +1,11 @@
 /**
  * Location Safety Service
  * ========================
+ * Uses browser native Geolocation API (navigator.geolocation.watchPosition)
  * Firestore structure:
- *   locationSafety/{caregiverId}/{patientId}   -- caregiver sets safe zone config
- *   locationSafety/{patientId}/current         -- patient writes their latest position
- *   locationAlerts/{caregiverId}/alerts/{docId} -- alert records
- *
- * Alert cooldown: minimum 10 minutes between alerts for the same patient.
+ *   locationSafety/{caregiverId}/patients/{patientId}   -- safe zone configuration
+ *   patientLocation/{patientId}                         -- patient's latest location
+ *   locationAlerts/{caregiverId}/alerts/{docId}         -- alert records
  */
 import {
   getFirestore,
@@ -17,60 +16,116 @@ import { getAuth } from 'firebase/auth';
 
 const db = getFirestore();
 
-// ── Caregiver: Safe Zone Config ─────────────────────────────────────────────
+// ── Haversine Formula ────────────────────────────────────────────────────────
+/**
+ * Calculates the great-circle distance in meters between two lat/lng points.
+ */
+export function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // Earth radius in meters
+  const toRad = d => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
 
-/** Save / update the safe-zone config for a patient */
+// ── Caregiver: Safe Zone Configuration ─────────────────────────────────────
+
+/** Save or update the safe-zone config for a patient */
 export async function saveSafeZone(caregiverId, patientId, { lat, lng, radiusMeters, enabled }) {
+  if (!caregiverId || !patientId) throw new Error('Missing caregiverId or patientId');
   const ref = doc(db, 'locationSafety', caregiverId, 'patients', patientId);
-  await setDoc(ref, { lat, lng, radiusMeters, enabled, updatedAt: serverTimestamp() }, { merge: true });
+  const config = {
+    lat: Number(lat),
+    lng: Number(lng),
+    radiusMeters: Number(radiusMeters),
+    enabled: Boolean(enabled),
+    updatedAt: serverTimestamp(),
+  };
+  await setDoc(ref, config, { merge: true });
+
+  // Mirror copy so patient device can inspect zone during watchPosition
+  const mirrorRef = doc(db, 'patientLocation', patientId, 'safeZones', caregiverId);
+  await setDoc(mirrorRef, { ...config, caregiverId }, { merge: true });
+
+  return config;
 }
 
 /** Get the safe-zone config for a patient */
 export async function getSafeZone(caregiverId, patientId) {
+  if (!caregiverId || !patientId) return null;
   const ref = doc(db, 'locationSafety', caregiverId, 'patients', patientId);
   const snap = await getDoc(ref);
   return snap.exists() ? snap.data() : null;
 }
 
-/** Subscribe to safe-zone config changes in real time */
+/** Subscribe to real-time safe-zone config changes */
 export function subscribeSafeZone(caregiverId, patientId, callback) {
+  if (!caregiverId || !patientId) return () => {};
   const ref = doc(db, 'locationSafety', caregiverId, 'patients', patientId);
   return onSnapshot(ref, snap => callback(snap.exists() ? snap.data() : null));
 }
 
 // ── Patient: Location Sharing ───────────────────────────────────────────────
 
-let _watchId  = null;
-let _alertCooldowns = {}; // { [caregiverId]: lastAlertTimestamp }
+let _watchId = null;
+const _alertCooldowns = {}; // { [caregiverId]: lastAlertTimestamp }
+const ALERT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes debouncing
 
-/** Start sharing location. Writes to Firestore on each position update. */
+/** Start sharing location via navigator.geolocation.watchPosition */
 export function startLocationSharing(patientId, onStatus) {
   if (!navigator.geolocation) {
-    onStatus?.('unsupported'); return;
+    onStatus?.('unsupported');
+    return;
   }
+
+  stopLocationSharing();
+
   _watchId = navigator.geolocation.watchPosition(
     async (pos) => {
       const { latitude, longitude, accuracy } = pos.coords;
-      onStatus?.('sharing');
+      onStatus?.({ status: 'sharing', lat: latitude, lng: longitude, accuracy, timestamp: Date.now() });
 
-      // Write current position
-      const posRef = doc(db, 'patientLocation', patientId);
-      await setDoc(posRef, {
-        lat: latitude, lng: longitude, accuracy,
-        updatedAt: serverTimestamp(),
-      }).catch(() => {});
+      // Update patient's latest location in Firestore
+      try {
+        const posRef = doc(db, 'patientLocation', patientId);
+        await setDoc(posRef, {
+          lat: latitude,
+          lng: longitude,
+          accuracy: accuracy || 0,
+          updatedAt: serverTimestamp(),
+          clientTime: Date.now(),
+        }, { merge: true });
 
-      // Check all safe zones for this patient
-      await checkSafeZones(patientId, latitude, longitude);
+        // Check configured safe zones
+        await checkSafeZones(patientId, latitude, longitude);
+      } catch (e) {
+        // Network/permission error on write
+      }
     },
     (err) => {
-      if (err.code === 1) onStatus?.('denied');
-      else onStatus?.('error');
+      if (err.code === 1) {
+        onStatus?.('denied');
+      } else if (err.code === 2) {
+        onStatus?.('unavailable');
+      } else if (err.code === 3) {
+        onStatus?.('timeout');
+      } else {
+        onStatus?.('error');
+      }
     },
-    { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
+    {
+      enableHighAccuracy: true,
+      maximumAge: 10000,
+      timeout: 15000,
+    }
   );
 }
 
+/** Stop active watchPosition process */
 export function stopLocationSharing() {
   if (_watchId !== null) {
     navigator.geolocation.clearWatch(_watchId);
@@ -78,53 +133,45 @@ export function stopLocationSharing() {
   }
 }
 
-/** Get the patient's last known position */
+/** Get patient's latest position */
 export async function getPatientLocation(patientId) {
+  if (!patientId) return null;
   const ref = doc(db, 'patientLocation', patientId);
   const snap = await getDoc(ref);
   return snap.exists() ? snap.data() : null;
 }
 
-/** Subscribe to patient location updates in real time */
+/** Subscribe to real-time updates for a patient's location */
 export function subscribePatientLocation(patientId, callback) {
+  if (!patientId) return () => {};
   const ref = doc(db, 'patientLocation', patientId);
-  return onSnapshot(ref, snap => callback(snap.exists() ? snap.data() : null));
+  return onSnapshot(ref, snap => {
+    if (!snap.exists()) {
+      callback(null);
+      return;
+    }
+    const data = snap.data();
+    // Check for stale location (> 5 minutes old)
+    const updatedMs = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : data.clientTime || 0;
+    const isStale = updatedMs > 0 && (Date.now() - updatedMs > 5 * 60 * 1000);
+
+    callback({
+      ...data,
+      isStale,
+    });
+  });
 }
 
-// ── Alert logic ──────────────────────────────────────────────────────────────
-
-const ALERT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
-
-/** Haversine distance in metres between two lat/lng points */
-function haversineMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const toRad = d => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// ── Alert Check Logic ────────────────────────────────────────────────────────
 
 async function checkSafeZones(patientId, lat, lng) {
-  // Find all caregivers that have a safe zone configured for this patient
-  // (In production this would be a Firestore collection group query;
-  //  here we query the caregiver's own collection using their UID from the
-  //  patient's profile — kept simple to match existing data model)
   try {
-    const auth = getAuth();
-    const user = auth.currentUser;
-    if (!user) return;
-
-    // Patient reads their own safe-zone config (caregiver writes it there)
-    // We store a copy at patientLocation/{patientId}/safeZones/{caregiverId}
     const zonesRef = collection(db, 'patientLocation', patientId, 'safeZones');
     const snap = await getDocs(zonesRef);
 
     for (const zoneDoc of snap.docs) {
       const zone = zoneDoc.data();
-      if (!zone.enabled) continue;
+      if (!zone.enabled || !zone.lat || !zone.lng || !zone.radiusMeters) continue;
 
       const dist = haversineMeters(lat, lng, zone.lat, zone.lng);
       const isOutside = dist > zone.radiusMeters;
@@ -134,45 +181,48 @@ async function checkSafeZones(patientId, lat, lng) {
         const now = Date.now();
         const lastAlert = _alertCooldowns[caregiverId] || 0;
 
+        // Apply notification cooldown/debouncing
         if (now - lastAlert > ALERT_COOLDOWN_MS) {
           _alertCooldowns[caregiverId] = now;
-          // Write alert to caregiver's alert collection
           const alertsRef = collection(db, 'locationAlerts', caregiverId, 'alerts');
           await addDoc(alertsRef, {
             patientId,
-            message: `Patient has moved outside the safe zone (${Math.round(dist)}m from center).`,
-            dist: Math.round(dist),
+            message: `Patient is outside safe zone (${dist}m from center, max ${zone.radiusMeters}m).`,
+            dist,
             radius: zone.radiusMeters,
-            lat, lng,
-            status: 'sent',
+            lat,
+            lng,
+            status: 'unacknowledged',
             createdAt: serverTimestamp(),
           });
         }
       }
     }
-  } catch {
-    // Non-critical — fail silently
+  } catch (err) {
+    // Non-blocking catch
   }
 }
 
-/** Copy safe-zone config to patientLocation/{patientId}/safeZones/{caregiverId}
- *  so the patient's device can check it during watchPosition */
+/** Get location alerts for caregiver */
+export async function getLocationAlerts(caregiverId) {
+  if (!caregiverId) return [];
+  const ref = collection(db, 'locationAlerts', caregiverId, 'alerts');
+  const q = query(ref, orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+/** Real-time subscription for location alerts */
+export function subscribeLocationAlerts(caregiverId, callback) {
+  if (!caregiverId) return () => {};
+  const ref = collection(db, 'locationAlerts', caregiverId, 'alerts');
+  const q = query(ref, orderBy('createdAt', 'desc'));
+  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+}
+
+/** Mirror function maintained for backwards compatibility */
 export async function publishSafeZoneToPatient(caregiverId, patientId, zoneData) {
   const ref = doc(db, 'patientLocation', patientId, 'safeZones', caregiverId);
   await setDoc(ref, { ...zoneData, caregiverId }, { merge: true });
 }
 
-/** Get caregiver's location alerts */
-export async function getLocationAlerts(caregiverId) {
-  const ref = collection(db, 'locationAlerts', caregiverId, 'alerts');
-  const q   = query(ref, orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-
-/** Subscribe to location alerts in real time */
-export function subscribeLocationAlerts(caregiverId, callback) {
-  const ref = collection(db, 'locationAlerts', caregiverId, 'alerts');
-  const q   = query(ref, orderBy('createdAt', 'desc'));
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-}

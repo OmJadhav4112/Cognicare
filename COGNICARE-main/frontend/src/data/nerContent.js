@@ -66,10 +66,10 @@ export const NER_CONTENT = [
 ];
 
 export const GAME_CONFIG = {
-  memoryMatching: { easy: 6, medium: 10, hard: 16 },
-  pictureRecall:  { easy: 4, medium: 6,  hard: 9  },
-  sequenceMemory: { easy: 3, medium: 5,  hard: 7  },
-  patternAttention:{ easy: 4, medium: 6, hard: 9  }
+  memoryMatching:  { easy: 6, medium: 10, hard: 16 },
+  pictureRecall:   { easy: 4, medium: 6,  hard: 9  },
+  sequenceMemory:  { easy: 3, medium: 5,  hard: 8  },
+  patternAttention: { easy: 4, medium: 6,  hard: 9  }
 };
 
 export const CATEGORIES = [...new Set(NER_CONTENT.map(i => i.category))];
@@ -87,9 +87,32 @@ const shuffle = (arr) => {
 /** Get random items filtered by difficulty/category */
 export const getRandomItems = (count, difficulty = null, category = null) => {
   let pool = [...NER_CONTENT];
-  if (difficulty) pool = pool.filter(i => i.difficulty === difficulty);
-  if (category) pool = pool.filter(i => i.category === category);
-  return shuffle(pool).slice(0, count);
+  if (difficulty) {
+    if (difficulty === 'easy') {
+      const easyPool = pool.filter(i => i.difficulty === 'easy');
+      if (easyPool.length >= count) pool = easyPool;
+    } else if (difficulty === 'medium') {
+      const medPool = pool.filter(i => i.difficulty === 'easy' || i.difficulty === 'medium');
+      if (medPool.length >= count) pool = medPool;
+    } else {
+      // Hard mode: include all content items for maximum variety
+      pool = [...NER_CONTENT];
+    }
+  }
+
+  if (category) {
+    const catPool = pool.filter(i => i.category === category);
+    if (catPool.length >= count) {
+      pool = catPool;
+    }
+  }
+
+  const selected = shuffle(pool).slice(0, count);
+  if (selected.length < count) {
+    const remaining = shuffle(NER_CONTENT.filter(i => !selected.some(s => s.id === i.id)));
+    return [...selected, ...remaining.slice(0, count - selected.length)];
+  }
+  return selected;
 };
 
 /** Get pairs for memory matching */
@@ -102,8 +125,8 @@ export const getMatchingPairs = (pairCount, difficulty = 'easy') => {
 export const getPictureRecallSet = (studyCount, difficulty = 'easy') => {
   const studyItems = getRandomItems(studyCount, difficulty);
   const usedIds = new Set(studyItems.map(i => i.id));
-  const distractors = shuffle(NER_CONTENT.filter(i => !usedIds.has(i.id) && (!difficulty || i.difficulty === difficulty)))
-    .slice(0, Math.ceil(studyCount / 2));
+  const availableDistractors = NER_CONTENT.filter(i => !usedIds.has(i.id));
+  const distractors = shuffle(availableDistractors).slice(0, Math.ceil(studyCount / 2));
   return { studyItems, distractors };
 };
 
@@ -114,3 +137,4 @@ export const getSequenceItems = (length, difficulty = 'easy') =>
 /** Get items for pattern attention */
 export const getPatternItems = (count, difficulty = 'easy') =>
   getRandomItems(count + 3, difficulty);
+

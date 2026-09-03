@@ -5,6 +5,8 @@ import PageHeader from '../../components/common/PageHeader';
 import Spinner    from '../../components/common/Spinner';
 import { useToast } from '../../components/common/Toast';
 
+import { useAuth } from '../../context/AuthContext';
+
 const RECORDING_STATES = {
   idle:      'idle',
   recording: 'recording',
@@ -15,7 +17,10 @@ const RECORDING_STATES = {
 
 export default function VoiceNotesPage() {
   const { t }  = useLanguage();
+  const { user } = useAuth();
   const toast  = useToast();
+
+  const userId = user?.id || user?._id;
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [recState,  setRecState]  = useState(RECORDING_STATES.idle);
@@ -38,14 +43,14 @@ export default function VoiceNotesPage() {
   // ── Load saved notes ──────────────────────────────────────────────────────
   const loadNotes = useCallback(async () => {
     try {
-      const list = await getVoiceNotes();
+      const list = await getVoiceNotes(userId);
       setNotes(list);
     } catch {
-      // Silently fail (user might be offline or Firestore not configured)
+      // Silently fail
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => { loadNotes(); }, [loadNotes]);
 
@@ -75,11 +80,21 @@ export default function VoiceNotesPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunksRef.current = [];
-      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+
+      let mimeType = 'audio/webm';
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
+        if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
+        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+        else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+        else mimeType = '';
+      }
+
+      const options = mimeType ? { mimeType } : {};
+      const mr = new MediaRecorder(stream, options);
+      mr.ondataavailable = e => { if (e.data?.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' });
         audioBlobRef.current = blob;
         const url = URL.createObjectURL(blob);
         setPreviewUrl(url);
@@ -90,8 +105,8 @@ export default function VoiceNotesPage() {
       mr.start(250); // collect chunks every 250ms
       startTimer();
       setRecState(RECORDING_STATES.recording);
-    } catch {
-      toast(t('mic_denied'), 'error');
+    } catch (err) {
+      toast(err.message || t('mic_denied'), 'error');
     }
   };
 
@@ -105,8 +120,8 @@ export default function VoiceNotesPage() {
     if (!audioBlobRef.current) { toast(t('save_recording_first'), 'warning'); return; }
     setRecState(RECORDING_STATES.saving);
     try {
-      const saved = await saveVoiceNote(audioBlobRef.current, noteName);
-      setNotes(prev => [saved, ...prev]);
+      const saved = await saveVoiceNote(audioBlobRef.current, noteName, userId);
+      setNotes(prev => [saved, ...prev.filter(n => n.id !== saved.id)]);
       toast(t('voice_note_saved'), 'success');
       // cleanup
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -157,7 +172,7 @@ export default function VoiceNotesPage() {
         savedAudioRef.current?.pause();
         setPlayingId(null);
       }
-      await deleteVoiceNote(note.id, note.storePath);
+      await deleteVoiceNote(note.id, note.storePath, userId);
       setNotes(prev => prev.filter(n => n.id !== note.id));
       toast(t('voice_note_deleted'), 'info');
     } catch {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth }     from '../../context/AuthContext';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage, LanguageSelector } from '../../context/LanguageContext';
 import { ThemeToggle } from '../../context/ThemeContext';
 import LocationWatcher from './LocationWatcher';
 
@@ -36,17 +36,18 @@ export default function PatientLayout() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <LanguageSelector className="text-xs py-1 px-2" />
             <ThemeToggle />
             <button
               onClick={() => navigate('/patient/sos')}
-              className="flex items-center gap-1 bg-danger-500 text-white text-sm font-bold px-3 py-2 rounded-xl hover:bg-danger-600 transition-colors animate-sos-ring"
+              className="flex items-center gap-1 bg-danger-500 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl hover:bg-danger-600 transition-colors animate-sos-ring"
               aria-label="SOS Emergency"
             >
               🆘 {t('sos')}
             </button>
             <button
               onClick={() => navigate('/patient/profile')}
-              className="w-10 h-10 rounded-full font-bold text-lg flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-full font-bold text-sm flex items-center justify-center transition-colors"
               style={{ backgroundColor: 'var(--c-primary-100)', color: 'var(--c-primary-700)' }}
               aria-label={t('profile')}
               title={user?.name}
