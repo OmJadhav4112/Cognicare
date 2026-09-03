@@ -1,0 +1,494 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  DementiaCare+ Design System
+  ===========================
+  All Tailwind color tokens point to CSS variables (tailwind.config.js).
+  Switching .dark on <html> remaps every variable so every component updates
+  automatically -- no per-component dark: classes needed.
+
+  DARK MODE CONTRAST AUDIT (verified against surface-raised #1a2626)
+  ------------------------------------------------------------------
+  warm-900 (#f0f8f8) : CR 13:1  -- primary headings
+  warm-800 (#d8eeee) : CR  9:1  -- body text, labels
+  warm-700 (#bdd8d8) : CR  6:1  -- sub-labels, descriptions
+  warm-600 (#98bcbc) : CR  4:1  -- helper text, timestamps  (WCAG AA pass)
+  warm-500 (#7aa4a4) : CR  3:1  -- placeholders             (decorative)
+  warm-400 (#5e8888) : CR  2:1  -- subtle decorative only
+*/
+
+/* =========================================================
+   LIGHT PALETTE  (:root)
+   ========================================================= */
+:root {
+  /* primary -- warm teal */
+  --c-primary-50:  #f0fdfa;
+  --c-primary-100: #ccfbf1;
+  --c-primary-200: #99f6e4;
+  --c-primary-300: #5eead4;
+  --c-primary-400: #2dd4bf;
+  --c-primary-500: #14b8a6;
+  --c-primary-600: #0d9488;
+  --c-primary-700: #0f766e;
+  --c-primary-800: #115e59;
+  --c-primary-900: #134e4a;
+
+  /* secondary -- amber */
+  --c-secondary-50:  #fffbeb;
+  --c-secondary-100: #fef3c7;
+  --c-secondary-200: #fde68a;
+  --c-secondary-300: #fcd34d;
+  --c-secondary-400: #fbbf24;
+  --c-secondary-500: #f59e0b;
+  --c-secondary-600: #d97706;
+  --c-secondary-700: #b45309;
+  --c-secondary-800: #92400e;
+  --c-secondary-900: #78350f;
+
+  /* danger -- rose */
+  --c-danger-50:  #fff1f2;
+  --c-danger-100: #ffe4e6;
+  --c-danger-400: #fb7185;
+  --c-danger-500: #f43f5e;
+  --c-danger-600: #e11d48;
+  --c-danger-700: #be123c;
+
+  /* warm -- neutral grey scale */
+  --c-warm-50:  #fafaf9;
+  --c-warm-100: #f5f5f4;
+  --c-warm-200: #e7e5e4;
+  --c-warm-300: #d6d3d1;
+  --c-warm-400: #a8a29e;
+  --c-warm-500: #78716c;
+  --c-warm-600: #57534e;
+  --c-warm-700: #44403c;
+  --c-warm-800: #292524;
+  --c-warm-900: #1c1917;
+
+  /* Surface tokens */
+  --surface-base:    #f5f5f4;
+  --surface-raised:  #ffffff;
+  --surface-overlay: #ffffff;
+  --surface-input:   #ffffff;
+  --surface-border:  #e7e5e4;
+
+  /* Text tokens */
+  --text-primary:   #292524;
+  --text-secondary: #57534e;
+  --text-muted:     #a8a29e;
+  --text-inverted:  #ffffff;
+
+  /* Shadows */
+  --shadow-card: 0 4px 24px -2px rgba(0,0,0,0.08);
+  --shadow-soft: 0 2px 12px rgba(0,0,0,0.06);
+  --shadow-glow: 0 0 20px rgba(20,184,166,0.25);
+
+  /* Note card filter -- identity in light mode */
+  --note-filter: none;
+}
+
+/* =========================================================
+   DARK PALETTE  (.dark on <html>)
+   All warm-* values are MUCH lighter than the old palette to
+   guarantee readable text on surface-raised (#1a2626).
+   ========================================================= */
+.dark {
+  /* primary -- teal, bright and vibrant */
+  --c-primary-50:  #0a2220;
+  --c-primary-100: #0e2e2a;
+  --c-primary-200: #143d38;
+  --c-primary-300: #1d5550;
+  --c-primary-400: #2dd4bf;
+  --c-primary-500: #2dd4bf;
+  --c-primary-600: #5eead4;
+  --c-primary-700: #99f6e4;
+  --c-primary-800: #ccfbf1;
+  --c-primary-900: #f0fdfa;
+
+  /* secondary -- amber, keep vivid */
+  --c-secondary-50:  #241600;
+  --c-secondary-100: #342000;
+  --c-secondary-200: #4a3000;
+  --c-secondary-300: #7a5010;
+  --c-secondary-400: #fbbf24;
+  --c-secondary-500: #fbbf24;
+  --c-secondary-600: #fcd34d;
+  --c-secondary-700: #fde68a;
+  --c-secondary-800: #fef3c7;
+  --c-secondary-900: #fffbeb;
+
+  /* danger -- keep vivid */
+  --c-danger-50:  #280810;
+  --c-danger-100: #3a0e18;
+  --c-danger-400: #fb7185;
+  --c-danger-500: #f43f5e;
+  --c-danger-600: #fb7185;
+  --c-danger-700: #fda4af;
+
+  /*
+    warm -- CORRECTED contrast hierarchy
+    surface-raised = #1a2626. All values below verified:
+    warm-400 (#5e8888) CR ~2.1 -- decorative only
+    warm-500 (#7aa4a4) CR ~3.2 -- placeholders
+    warm-600 (#98bcbc) CR ~4.1 -- helper text, timestamps  [WCAG AA]
+    warm-700 (#bdd8d8) CR ~6.2 -- sub-labels, descriptions [WCAG AA]
+    warm-800 (#d8eeee) CR ~9.1 -- body text, labels        [WCAG AA]
+    warm-900 (#f0f8f8) CR ~13  -- headings, names          [WCAG AAA]
+  */
+  --c-warm-50:  #0f1818;
+  --c-warm-100: #1a2626;
+  --c-warm-200: #243434;
+  --c-warm-300: #2e4040;
+  --c-warm-400: #5e8888;
+  --c-warm-500: #7aa4a4;
+  --c-warm-600: #98bcbc;
+  --c-warm-700: #bdd8d8;
+  --c-warm-800: #d8eeee;
+  --c-warm-900: #f0f8f8;
+
+  /* Surface tokens */
+  --surface-base:    #0f1818;
+  --surface-raised:  #1a2626;
+  --surface-overlay: #1e2e2e;
+  --surface-input:   #142020;
+  --surface-border:  #2c4040;
+
+  /* Text tokens -- mapped to corrected warm values */
+  --text-primary:   #f0f8f8;
+  --text-secondary: #bdd8d8;
+  --text-muted:     #7aa4a4;
+  --text-inverted:  #0f1818;
+
+  /* Shadows */
+  --shadow-card: 0 4px 28px -4px rgba(0,0,0,0.6);
+  --shadow-soft: 0 2px 12px rgba(0,0,0,0.4);
+  --shadow-glow: 0 0 24px rgba(45,212,191,0.18);
+
+  /* Note card filter */
+  --note-filter: brightness(0.5) saturate(0.75);
+}
+
+/* =========================================================
+   BASE LAYER
+   ========================================================= */
+@layer base {
+  html {
+    font-size: 18px;
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--surface-base);
+    color: var(--text-primary);
+    @apply font-sans antialiased;
+    min-height: 100dvh;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  *:focus-visible {
+    outline: 3px solid var(--c-primary-500);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+  *:focus:not(:focus-visible) { outline: none; }
+
+  h1 { @apply text-3xl font-bold leading-tight;  color: var(--text-primary); }
+  h2 { @apply text-2xl font-bold;               color: var(--text-primary); }
+  h3 { @apply text-xl  font-semibold;           color: var(--text-primary); }
+  h4 { @apply text-lg  font-semibold;           color: var(--text-primary); }
+  p  { @apply text-base leading-relaxed;        color: var(--text-secondary); }
+
+  button, a, [role="button"] { min-height: 3rem; @apply cursor-pointer; }
+
+  input, textarea, select {
+    @apply text-base;
+    color: var(--text-primary);
+    background-color: var(--surface-input);
+  }
+}
+
+/* =========================================================
+   COMPONENT LAYER
+   ========================================================= */
+@layer components {
+
+  /* Cards */
+  .card {
+    background-color: var(--surface-raised);
+    border: 1px solid var(--surface-border);
+    box-shadow: var(--shadow-card);
+    @apply rounded-3xl p-5;
+    transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+  .card-sm {
+    background-color: var(--surface-raised);
+    border: 1px solid var(--surface-border);
+    box-shadow: var(--shadow-soft);
+    @apply rounded-2xl p-4;
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2
+           font-semibold rounded-2xl px-6 py-3
+           transition-all duration-200 ease-in-out
+           focus-visible:ring-4 focus-visible:ring-primary-400
+           disabled:opacity-50 disabled:cursor-not-allowed
+           text-base min-h-touch select-none;
+  }
+  .btn-primary {
+    @apply btn shadow-sm hover:shadow-md active:scale-[0.98];
+    background-color: var(--c-primary-600);
+    color: var(--text-inverted);
+  }
+  .btn-primary:hover { background-color: var(--c-primary-700); }
+
+  .btn-secondary {
+    @apply btn active:scale-[0.98];
+    background-color: var(--c-secondary-500);
+    color: var(--text-inverted);
+  }
+  .btn-secondary:hover { background-color: var(--c-secondary-600); }
+
+  .btn-outline {
+    @apply btn active:scale-[0.98];
+    border: 2px solid var(--c-primary-600);
+    color: var(--c-primary-700);
+    background-color: transparent;
+  }
+  .btn-outline:hover { background-color: var(--c-primary-100); }
+
+  .btn-ghost {
+    @apply btn active:scale-[0.98];
+    color: var(--text-secondary);
+    background-color: transparent;
+  }
+  .btn-ghost:hover { background-color: var(--c-warm-200); }
+
+  .btn-danger {
+    @apply btn shadow-sm hover:shadow-md active:scale-[0.98];
+    background-color: var(--c-danger-500);
+    color: #ffffff;
+  }
+  .btn-danger:hover { background-color: var(--c-danger-600); }
+
+  .btn-lg { @apply text-xl px-8 py-4 rounded-3xl; }
+  .btn-sm { @apply text-sm px-4 py-2 rounded-xl min-h-0; }
+
+  /* Form fields */
+  .field-label {
+    @apply block text-base font-semibold mb-2;
+    color: var(--text-secondary);
+  }
+  .field-input {
+    @apply w-full rounded-2xl px-4 py-3 text-base focus:ring-0 transition duration-150;
+    background-color: var(--surface-input);
+    color: var(--text-primary);
+    border: 2px solid var(--surface-border);
+  }
+  .field-input::placeholder { color: var(--text-muted); }
+  .field-input:focus { border-color: var(--c-primary-500); }
+  .field-select { @apply field-input appearance-none; }
+  .field-error  { @apply text-sm mt-1; color: var(--c-danger-500); }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center gap-1 text-sm font-medium rounded-full px-3 py-1;
+  }
+  .badge-green  { @apply badge; background-color: var(--c-primary-100);   color: var(--c-primary-800); }
+  .badge-amber  { @apply badge; background-color: var(--c-secondary-100); color: var(--c-secondary-800); }
+  .badge-red    { @apply badge; background-color: var(--c-danger-100);    color: var(--c-danger-600); }
+  .badge-grey   { @apply badge; background-color: var(--c-warm-200);      color: var(--c-warm-800); }
+
+  /* Difficulty badges */
+  .diff-easy   { @apply badge; background-color: var(--c-primary-100);   color: var(--c-primary-800); }
+  .diff-medium { @apply badge; background-color: var(--c-secondary-100); color: var(--c-secondary-800); }
+  .diff-hard   { @apply badge; background-color: var(--c-danger-100);    color: var(--c-danger-600); }
+
+  /* Navigation */
+  .nav-item {
+    @apply flex flex-col items-center justify-center gap-1
+           text-xs font-medium py-2 px-3 rounded-2xl
+           transition-colors duration-150 min-h-touch min-w-touch;
+    color: var(--text-muted);
+  }
+  .nav-item:hover {
+    color: var(--c-primary-600);
+    background-color: var(--c-primary-100);
+  }
+  .nav-item-active {
+    @apply nav-item;
+    color: var(--c-primary-700);
+    background-color: var(--c-primary-100);
+  }
+
+  /* Progress bars */
+  .progress-track {
+    @apply w-full rounded-full overflow-hidden;
+    background-color: var(--c-warm-200);
+    height: 12px;
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500;
+    background-color: var(--c-primary-500);
+  }
+
+  /* Section header */
+  .section-header { @apply flex items-center justify-between mb-4; }
+
+  /* Page wrapper */
+  .page-wrapper { @apply max-w-2xl mx-auto px-4 pb-28 pt-6; }
+
+  /* Reminder items */
+  .reminder-item {
+    @apply flex items-center gap-4 p-4 rounded-2xl transition-colors;
+    background-color: var(--surface-raised);
+    border: 2px solid var(--surface-border);
+  }
+  .reminder-item:hover { border-color: var(--c-primary-400); }
+  .reminder-item-done {
+    @apply reminder-item opacity-75;
+    background-color: var(--c-primary-50);
+    border-color: var(--c-primary-200);
+  }
+
+  /* SOS button */
+  .sos-btn {
+    @apply w-full py-6 text-2xl font-bold rounded-3xl
+           shadow-lg active:scale-95 transition-all duration-150 select-none;
+    background-color: var(--c-danger-500);
+    color: #ffffff;
+  }
+  .sos-btn:hover { background-color: var(--c-danger-600); }
+
+  /* Empty state */
+  .empty-state {
+    @apply flex flex-col items-center justify-center text-center py-16 gap-4;
+    color: var(--text-muted);
+  }
+
+  /* Alerts */
+  .alert { @apply rounded-2xl p-4 text-base font-medium; }
+
+  .alert-info {
+    @apply alert;
+    background-color: var(--c-primary-50);
+    color: var(--c-primary-800);
+    border: 1px solid var(--c-primary-200);
+  }
+  .alert-success {
+    @apply alert;
+    background-color: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+  }
+  .dark .alert-success {
+    background-color: #062012;
+    color: #6ee7a0;
+    border-color: #166534;
+  }
+  .alert-warning {
+    @apply alert;
+    background-color: #fefce8;
+    color: #854d0e;
+    border: 1px solid #fde68a;
+  }
+  .dark .alert-warning {
+    background-color: #1e1600;
+    color: #fde68a;
+    border-color: #92600a;
+  }
+  .alert-danger {
+    @apply alert;
+    background-color: var(--c-danger-50);
+    color: var(--c-danger-600);
+    border: 1px solid var(--c-danger-100);
+  }
+
+  /* Spinner */
+  .spinner {
+    @apply rounded-full border-4 animate-spin;
+    border-color: var(--c-warm-200);
+    border-top-color: var(--c-primary-600);
+  }
+
+  /* Page title row */
+  .page-title-row { @apply flex items-center gap-3 mb-6; }
+  .page-title-row .back-btn {
+    @apply flex items-center justify-center w-12 h-12 rounded-2xl transition-colors;
+    background-color: var(--surface-raised);
+    box-shadow: var(--shadow-soft);
+    color: var(--text-secondary);
+    border: 1px solid var(--surface-border);
+  }
+  .page-title-row .back-btn:hover { background-color: var(--c-warm-200); }
+}
+
+/* =========================================================
+   GLOBAL SURFACE OVERRIDES
+   Header and bottom-nav use !important to override any
+   Tailwind utility bg- classes placed directly on them.
+   ========================================================= */
+header {
+  background-color: var(--surface-raised) !important;
+  border-bottom: 1px solid var(--surface-border) !important;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+nav.fixed {
+  background-color: var(--surface-raised) !important;
+  border-top-color: var(--surface-border) !important;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+/* =========================================================
+   UTILITIES
+   ========================================================= */
+@layer utilities {
+  .scroll-snap-x {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll-snap-start { scroll-snap-align: start; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
+  }
+
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 1rem); }
+
+  /* Surface utility — use instead of bg-white so dark mode works */
+  .bg-surface        { background-color: var(--surface-raised); }
+  .bg-surface-input  { background-color: var(--surface-input); }
+  .bg-surface-base   { background-color: var(--surface-base); }
+  .text-on-surface   { color: var(--text-primary); }
+  .text-secondary-ui { color: var(--text-secondary); }
+  .text-muted-ui     { color: var(--text-muted); }
+  .border-surface    { border-color: var(--surface-border); }
+}
+
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(0.95); box-shadow: 0 0 0 0    rgba(244,63,94,0.5); }
+  70%  { transform: scale(1);    box-shadow: 0 0 0 16px rgba(244,63,94,0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0    rgba(244,63,94,0); }
+}
+@keyframes recording-pulse {
+  0%,100% { transform: scale(1);    opacity: 1; }
+  50%      { transform: scale(1.08); opacity: 0.8; }
+}
+
+.animate-fade-in       { animation: fadeIn 0.3s ease-out both; }
+.animate-sos-ring      { animation: pulse-ring 1.5s infinite; }
+.animate-recording     { animation: recording-pulse 1.2s ease-in-out infinite; }

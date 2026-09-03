@@ -1,0 +1,315 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║        DementiaCare+ AUTHENTICATION ERRORS - COMPREHENSIVE ANALYSIS          ║
+║                         6 CRITICAL ERRORS FOUND                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─ ERROR #1: CRITICAL - TOKEN KEY MISMATCH ─────────────────────────────────┐
+│                                                                             │
+│  LOCATION: frontend/src/services/api.js (line 11, 21)                      │
+│            frontend/src/context/AuthContext.jsx (line 155, 212)            │
+│                                                                             │
+│  PROBLEM:                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ AuthContext.jsx STORES token with key "authToken"                  │   │
+│  │ ❌ localStorage.setItem('authToken', data.token)                   │   │
+│  │                                                                     │   │
+│  │ BUT api.js RETRIEVES token with key "dc_token"                     │   │
+│  │ ❌ const token = localStorage.getItem('dc_token')                  │   │
+│  │                                                                     │   │
+│  │ RESULT: Token stored under "authToken" but api.js looks for        │   │
+│  │         "dc_token" → NOT FOUND → Authorization header never set    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  IMPACT: 🔴 CRITICAL - BLOCKS ALL AUTHENTICATED API REQUESTS               │
+│                                                                             │
+│  LOGIN FLOW BROKEN:                                                         │
+│  1. User registers → JWT token generated ✅                                 │
+│  2. Token stored in localStorage["authToken"] ✅                            │
+│  3. User redirected to dashboard ✅                                         │
+│  4. Dashboard tries to fetch profile → API call made ❌                     │
+│  5. api.js looks for localStorage["dc_token"] → NOT FOUND ❌                │
+│  6. Authorization header NOT SET ❌                                         │
+│  7. Backend returns 401 Unauthorized ❌                                     │
+│  8. User appears logged in but ALL API calls fail ❌                        │
+│                                                                             │
+│  FIX: Change api.js line 11 from:                                           │
+│       const token = localStorage.getItem('dc_token');                       │
+│       TO:                                                                   │
+│       const token = localStorage.getItem('authToken');                      │
+│                                                                             │
+│  Also change line 21 from:                                                  │
+│       localStorage.removeItem('dc_token');                                  │
+│       TO:                                                                   │
+│       localStorage.removeItem('authToken');                                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ ERROR #2: CRITICAL - MISSING JWT_SECRET IN .env ──────────────────────────┐
+│                                                                             │
+│  LOCATION: backend/.env (missing)                                          │
+│            backend/src/controllers/authController.js (lines 337, 397)      │
+│                                                                             │
+│  PROBLEM:                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ backend/.env DOES NOT contain JWT_SECRET                           │   │
+│  │                                                                     │   │
+│  │ Code falls back to hardcoded default:                              │   │
+│  │ process.env.JWT_SECRET || 'dev-secret-key-change-in-production'    │   │
+│  │                                                                     │   │
+│  │ ISSUE: If fallback changes, tokens won't verify                    │   │
+│  │        Different server instances use different secrets             │   │
+│  │        Security vulnerability in production                         │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  IMPACT: 🔴 CRITICAL - TOKEN VERIFICATION FAILS                            │
+│                                                                             │
+│  SCENARIO:                                                                  │
+│  1. JWT token generated with secret: 'dev-secret-key-change-...' ✅        │
+│  2. Token stored in localStorage ✅                                         │
+│  3. Server restarts or env changes ❌                                       │
+│  4. Token now generated with different secret ❌                            │
+│  5. Old token won't verify → 401 Unauthorized ❌                            │
+│  6. In production: Multiple servers = multiple secrets = failures ❌        │
+│                                                                             │
+│  FIX: Add to backend/.env:                                                  │
+│       JWT_SECRET=dementiacare-secure-jwt-secret-min-32-chars-change-me     │
+│                                                                             │
+│  Or generate secure secret:                                                │
+│       JWT_SECRET=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9base64random          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ ERROR #3: HIGH - PASSWORD VALIDATION MISMATCH ────────────────────────────┐
+│                                                                             │
+│  LOCATION: frontend/src/pages/auth/RegisterPage.jsx (line 109)             │
+│            backend/src/routes/auth.js (lines 15-20, 37-38)                 │
+│                                                                             │
+│  PROBLEM:                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ FRONTEND Password Requirements:                                    │   │
+│  │ • Minimum 6 characters only                                        │   │
+│  │                                                                     │   │
+│  │ BACKEND Password Requirements (INCONSISTENT):                      │   │
+│  │ • POST /auth/register: 8+ chars, uppercase, lowercase, digit,     │   │
+│  │                        special char (passwordStrengthValidation)   │   │
+│  │ • POST /auth/register-dev: 6+ chars only (registerDevValidation)  │   │
+│  │                                                                     │   │
+│  │ MISMATCH: Dev endpoint allows weak passwords!                      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  IMPACT: 🟡 HIGH - SECURITY HOLE + WEAK PASSWORDS                          │
+│                                                                             │
+│  SCENARIO:                                                                  │
+│  1. User enters 6-char password: "Pass1!" ✅                                │
+│  2. Frontend validates → passes (minimum 6) ✅                              │
+│  3. Frontend sends to /auth/register-dev ✅                                 │
+│  4. Backend validates → passes (minimum 6) ✅                               │
+│  5. Password stored: "Pass1!" → VERY WEAK ❌                                │
+│  6. Should require 8+ chars, uppercase, lowercase, digit, special ❌        │
+│                                                                             │
+│  FIX: Make registerDevValidation use passwordStrengthValidation:            │
+│       In backend/src/routes/auth.js line 28-30:                            │
+│                                                                             │
+│       FROM:                                                                │
+│       const registerDevValidation = [                                      │
+│         body('password').isLength({ min: 6 })...                           │
+│       ];                                                                    │
+│                                                                             │
+│       TO:                                                                  │
+│       const registerDevValidation = [                                      │
+│         passwordStrengthValidation,  // Use 8+ chars, complex              │
+│       ];                                                                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ ERROR #4: HIGH - UNCAUGHT PASSWORD VERIFICATION ERROR ──────────────────────┐
+│                                                                              │
+│  LOCATION: backend/src/controllers/authController.js (line 310)             │
+│                                                                              │
+│  PROBLEM:                                                                    │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ const isPasswordValid = await user.matchPassword(password);         │   │
+│  │                                                                      │   │
+│  │ No error handling! If user.password is null, bcrypt throws error   │   │
+│  │ Error not caught → Generic 500 response to frontend                │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  IMPACT: 🟡 HIGH - POOR ERROR MESSAGES, DEBUGGING IMPOSSIBLE                │
+│                                                                              │
+│  SCENARIO:                                                                   │
+│  1. Password hashing fails during registration ❌                            │
+│  2. User created with null password ❌                                       │
+│  3. User registration succeeds → JWT returned ✅                             │
+│  4. User tries to login ✅                                                   │
+│  5. backend calls user.matchPassword(password) ❌                            │
+│  6. user.password is null → bcrypt throws error ❌                           │
+│  7. Error not caught → 500 "Server error" ❌                                 │
+│  8. User gets cryptic error instead of "Invalid password" ❌                 │
+│                                                                              │
+│  FIX: Add try-catch around password verification:                           │
+│       Let isPasswordValid = false;                                          │
+│       try {                                                                 │
+│         if (!user.password) {                                               │
+│           isPasswordValid = false;                                          │
+│         } else {                                                            │
+│           isPasswordValid = await user.matchPassword(password);             │
+│         }                                                                   │
+│       } catch (err) {                                                       │
+│         console.error('Password error:', err);                              │
+│         return res.status(401).json(...);                                   │
+│       }                                                                     │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ ERROR #5: HIGH - NO PASSWORD HASHING VALIDATION ──────────────────────────┐
+│                                                                             │
+│  LOCATION: backend/src/controllers/authController.js (lines 360-398)       │
+│                                                                             │
+│  PROBLEM:                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ const user = await User.create({                                   │   │
+│  │   password,  // Password passed but NOT VALIDATED after hashing    │   │
+│  │   ...                                                               │   │
+│  │ });                                                                 │   │
+│  │                                                                     │   │
+│  │ No check that password was actually hashed and stored              │   │
+│  │ Pre-save hook might fail silently                                   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  IMPACT: 🟡 HIGH - USERS PERMANENTLY LOCKED OUT                            │
+│                                                                             │
+│  SCENARIO:                                                                  │
+│  1. User registers with password: "SecurePass123!" ✅                       │
+│  2. Pre-save middleware attempts bcrypt hashing ✅                          │
+│  3. Hashing FAILS (permission error, server issue) ❌                        │
+│  4. Password field left as null or plaintext ❌                             │
+│  5. Registration succeeds, JWT returned to user ✅                          │
+│  6. User thinks account created ✅                                          │
+│  7. User tries to login with password ✅                                    │
+│  8. matchPassword fails (password is null) ❌                               │
+│  9. User permanently locked out with no explanation ❌                      │
+│                                                                             │
+│  FIX: Add validation after User.create():                                   │
+│       if (!user.password) {                                                 │
+│         throw new Error('Password hashing failed');                         │
+│       }                                                                     │
+│       if (!user.password.startsWith('$2')) {                                │
+│         throw new Error('Password was not properly hashed');                │
+│       }                                                                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ ERROR #6: MEDIUM - MISSING PASSWORD FIELD NULL CHECK ────────────────────┐
+│                                                                             │
+│  LOCATION: backend/src/controllers/authController.js (line 283)            │
+│                                                                             │
+│  PROBLEM:                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ const user = await User.findOne({ email }).select('+password');    │   │
+│  │                                                                     │   │
+│  │ No validation that password field was actually selected/exists      │   │
+│  │ If select() fails, password is undefined                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  IMPACT: 🟠 MEDIUM - EDGE CASE FAILURES                                    │
+│                                                                             │
+│  FIX: Add null check after query:                                           │
+│       if (!user || !user.password) {                                        │
+│         return res.status(401).json({                                       │
+│           success: false,                                                  │
+│           message: 'Invalid email or password.'                             │
+│         });                                                                 │
+│       }                                                                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          ERROR SEVERITY SUMMARY                              ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  🔴 CRITICAL (2 errors) - MUST FIX IMMEDIATELY                              ║
+║  ├─ Error #1: Token key mismatch                                            ║
+║  └─ Error #2: Missing JWT_SECRET                                            ║
+║                                                                              ║
+║  🟡 HIGH (3 errors) - FIX SOON                                              ║
+║  ├─ Error #3: Password validation mismatch                                  ║
+║  ├─ Error #4: No error handling on password verify                          ║
+║  └─ Error #5: No validation of password hashing                             ║
+║                                                                              ║
+║  🟠 MEDIUM (1 error) - FIX WHEN POSSIBLE                                    ║
+║  └─ Error #6: Missing null check on password field                          ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─ FIX PRIORITY & ORDER ────────────────────────────────────────────────────┐
+│                                                                            │
+│  PRIORITY 1 (IMMEDIATE):                                                  │
+│  1. Fix ERROR #1: Change 'dc_token' to 'authToken' in api.js             │
+│  2. Fix ERROR #2: Add JWT_SECRET to backend/.env                         │
+│     → After these fixes: LOGIN WILL WORK                                  │
+│                                                                            │
+│  PRIORITY 2 (SOON):                                                       │
+│  3. Fix ERROR #3: Use consistent password validation                      │
+│  4. Fix ERROR #4: Add error handling for password verification            │
+│  5. Fix ERROR #5: Validate password was hashed                            │
+│     → After these fixes: SECURITY IMPROVED                                │
+│                                                                            │
+│  PRIORITY 3 (WHEN POSSIBLE):                                              │
+│  6. Fix ERROR #6: Add explicit null checks                                │
+│     → After this fix: EDGE CASES HANDLED                                  │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ WHAT HAPPENS WITH EACH ERROR ────────────────────────────────────────────┐
+│                                                                            │
+│  CURRENT STATE (All errors present):                                      │
+│  ┌────────────────────────────────────────────────────────────────────┐   │
+│  │ 1. User registers → Backend returns JWT token ✅                  │   │
+│  │ 2. Token stored in localStorage["authToken"] ✅                   │   │
+│  │ 3. User redirected to dashboard ✅                               │   │
+│  │ 4. Dashboard tries API call ❌                                    │   │
+│  │ 5. api.js looks for localStorage["dc_token"] → NOT FOUND ❌       │   │
+│  │ 6. No Authorization header ❌                                     │   │
+│  │ 7. Backend returns 401 ❌                                         │   │
+│  │ 8. User appears logged in but can't access anything ❌            │   │
+│  │ RESULT: LOGIN APPEARS TO WORK BUT ALL API CALLS FAIL             │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+│  AFTER FIXING ERROR #1 & #2:                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐   │
+│  │ 1. User registers → JWT token ✅                                  │   │
+│  │ 2. Token stored in localStorage["authToken"] ✅                   │   │
+│  │ 3. User redirected to dashboard ✅                               │   │
+│  │ 4. Dashboard API call ✅                                          │   │
+│  │ 5. api.js retrieves localStorage["authToken"] ✅                  │   │
+│  │ 6. Authorization header set ✅                                    │   │
+│  │ 7. Backend verifies JWT token ✅                                  │   │
+│  │ 8. API call succeeds ✅                                           │   │
+│  │ RESULT: COMPLETE LOGIN FLOW WORKS                                 │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              FILES TO FIX                                    ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  FILE 1 (CRITICAL): frontend/src/services/api.js                            ║
+║  ├─ Line 11: Change 'dc_token' → 'authToken'                                ║
+║  └─ Line 21: Change 'dc_token' → 'authToken'                                ║
+║                                                                              ║
+║  FILE 2 (CRITICAL): backend/.env                                            ║
+║  └─ Add line: JWT_SECRET=your-secure-secret-key-here                        ║
+║                                                                              ║
+║  FILE 3 (HIGH): backend/src/routes/auth.js                                  ║
+║  └─ Line 28-30: Use passwordStrengthValidation for registerDev              ║
+║                                                                              ║
+║  FILE 4 (HIGH): backend/src/controllers/authController.js                   ║
+║  ├─ Line 310: Add try-catch for password verification                       ║
+║  └─ Line 360-398: Add validation that password was hashed                   ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+ROOT CAUSE: Inconsistent token key naming between two frontend files
+SOLUTION: Standardize on 'authToken' across the application
+EXPECTED: Login works end-to-end with JWT authentication

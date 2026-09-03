@@ -1,0 +1,12 @@
+{
+  "name": "dementiacare-plus",
+  "version": "1.0.0",
+  "description": "DementiaCare+ — AI-powered cognitive companion for NER elderly patients",
+  "private": true,
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build"
+  }
+}
